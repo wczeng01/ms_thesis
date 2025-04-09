@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Video for YOLO Tracking</title>
+</head>
+<body>
+    <h1>Upload a Video</h1>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul>
+          {% for message in messages %}
+            <li>{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Upload and Run Tracking Form -->
+    <form method="POST" action="{{ url_for('upload_video') }}" enctype="multipart/form-data">
+      <label for="file">Select Video:</label>
+      <input type="file" name="file" accept="video/*" required><br><br>
+      <input type="submit" value="Upload and Run Tracking">
+    </form>
+
+    <!-- Stop Tracking Form -->
+    <form method="POST" action="{{ url_for('stop_tracking') }}">
+      <input type="submit" value="Stop Tracking">
+    </form>
+
+    <!-- Skip Tracking & Go to ID Processing Form -->
+    <form method="POST" action="{{ url_for('skip_tracking') }}">
+      <input type="submit" value="Skip Tracking & Go to ID Processing">
+    </form>
+
+    <!-- Go to Brood Page Form -->
+    <form method="POST" action="{{ url_for('skip_tracking2') }}">
+      <input type="submit" value="Go to Brood Page">
+    </form>
+</body>
+</html>
