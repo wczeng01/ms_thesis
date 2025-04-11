@@ -21,11 +21,12 @@ def main(video_path, flag):
         print(f"Error during tracking: {e}", file=sys.stderr)
 
 if __name__ == "__main__":
-    # Expect the video file path as a command-line argument
-    if len(sys.argv) < 2:
-        print("Usage: python run_tracking.py <video_path>")
+    # Expect the video file path and flag as command-line arguments
+    if len(sys.argv) < 3:
+        print("Usage: python run_tracking.py <video_path> <flag>")
         sys.exit(1)
 
     video_path = sys.argv[1]
-    print(f"Running tracking on: {video_path}")
-    main(video_path)
+    flag = int(sys.argv[2])  # Convert the flag to an integer
+    print(f"Running tracking on: {video_path} with flag: {flag}")
+    main(video_path, flag)

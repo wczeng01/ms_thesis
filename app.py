@@ -40,8 +40,8 @@ def upload_video():
         flash('Video uploaded successfully. Now starting the tracking process...')
         
         try:
-            yolo_process = subprocess.run(
-                ['python', 'run_tracking.py', uploaded_video_path, 0],
+            yolo_process = subprocess.Popen(
+                ['python', 'run_tracking.py', uploaded_video_path, "0"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
@@ -139,7 +139,7 @@ def stop_tracking2():
             print("Tracking process had already completed.")
     else:
         flash('No active tracking process.')
-    return redirect(url_for('upload_form'))
+    return redirect(url_for('process_form'))
 
 @app.route('/skip_tracking', methods=['POST'])
 def skip_tracking():
@@ -184,8 +184,8 @@ def brood():
         flash('Video uploaded successfully. Now starting the brood tracking process...')
         
         try:
-            yolo_process = subprocess.run(
-                ['python', 'run_tracking.py', uploaded_video_path, 1],
+            yolo_process = subprocess.Popen(
+                ['python', 'run_tracking.py', uploaded_video_path, "1"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
