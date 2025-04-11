@@ -417,3 +417,16 @@ runs/detect/track/video.avi
 __pycache__/test_track.cpython-312.pyc
 __pycache__/false_positive.cpython-312.pyc
 __pycache__/app.cpython-312.pyc
+runs/detect/track2/labels/video_1.txt
+runs/detect/track2/labels/video_10.txt
+runs/detect/track2/labels/video_11.txt
+runs/detect/track2/labels/video_2.txt
+runs/detect/track2/labels/video_3.txt
+runs/detect/track2/labels/video_4.txt
+runs/detect/track2/labels/video_5.txt
+runs/detect/track2/labels/video_6.txt
+runs/detect/track2/labels/video_7.txt
+runs/detect/track2/labels/video_8.txt
+runs/detect/track2/labels/video_9.txt
+runs/detect/track2/video.avi
+__pycache__/run_tracking.cpython-312.pyc

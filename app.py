@@ -42,15 +42,15 @@ def upload_video():
         try:
             yolo_process = subprocess.Popen(
                 ['python', 'run_tracking.py', uploaded_video_path, "0"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=open(os.devnull, 'w'),
+                stderr=open(os.devnull, 'w'),
                 text=True
             )
+            flash("Tracking process started successfully.")
         except Exception as e:
             flash(f"Error running tracking process: {e}")
             return redirect(url_for('index'))
         
-        flash("Tracking process completed. Now proceed to process false/true positive IDs.")
     return redirect(url_for('process_form'))
 
 @app.route('/process_form', methods=['GET'])
@@ -97,20 +97,15 @@ def process_ids():
 @app.route('/stop_tracking', methods=['POST'])
 def stop_tracking():
     global yolo_process
-    if yolo_process:
-        if yolo_process.poll() is None:
-            try:
-                yolo_process.send_signal(signal.SIGTERM)
-                yolo_process.wait()
-                yolo_process = None
-                flash('Tracking process stopped successfully.')
-                print("Tracking process stopped.")
-            except Exception as e:
-                flash(f"Error stopping the tracking process: {e}")
-                print(f"Error stopping the tracking process: {e}")
-        else:
-            flash('Tracking process is already completed.')
-            print("Tracking process had already completed.")
+    if yolo_process and yolo_process.poll() is None:
+        try:
+            yolo_process.kill()  # Kills immediately.
+            yolo_process = None
+            flash('Tracking process stopped immediately.')
+            print("Tracking process killed.")
+        except Exception as e:
+            flash(f"Error stopping the tracking process: {e}")
+            print(f"Error stopping the tracking process: {e}")
     else:
         flash('No active tracking process.')
     return redirect(url_for('process_form'))
@@ -118,20 +113,15 @@ def stop_tracking():
 @app.route('/stop_tracking2', methods=['POST'])
 def stop_tracking2():
     global yolo_process
-    if yolo_process:
-        if yolo_process.poll() is None:
-            try:
-                yolo_process.send_signal(signal.SIGTERM)
-                yolo_process.wait()
-                yolo_process = None
-                flash('Tracking process stopped successfully.')
-                print("Tracking process stopped.")
-            except Exception as e:
-                flash(f"Error stopping the tracking process: {e}")
-                print(f"Error stopping the tracking process: {e}")
-        else:
-            flash('Tracking process is already completed.')
-            print("Tracking process had already completed.")
+    if yolo_process and yolo_process.poll() is None:
+        try:
+            yolo_process.kill()  # Kills immediately.
+            yolo_process = None
+            flash('Tracking process stopped immediately.')
+            print("Tracking process killed.")
+        except Exception as e:
+            flash(f"Error stopping the tracking process: {e}")
+            print(f"Error stopping the tracking process: {e}")
     else:
         flash('No active tracking process.')
     return redirect(url_for('process_form'))
@@ -180,16 +170,16 @@ def brood():
         
         try:
             yolo_process = subprocess.Popen(
-                ['python', 'run_tracking.py', uploaded_video_path, "1"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                ['python', 'run_tracking.py', uploaded_video_path, "0"],
+                stdout=open(os.devnull, 'w'),
+                stderr=open(os.devnull, 'w'),
                 text=True
             )
+            flash("Tracking process started successfully.")
         except Exception as e:
             flash(f"Error running tracking process: {e}")
             return redirect(url_for('index'))
         
-        flash("Tracking process completed. Now proceed to brood analysis.")
     return redirect(url_for('brood_form'))
 
 @app.route('/brood2', methods=['POST'])
