@@ -1,4 +1,4 @@
-Flask==3.0.2
+Flask
 opencv-python-headless
-numpy==1.24.2
+numpy
 ultralytics==8.3.9
