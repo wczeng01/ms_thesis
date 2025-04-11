@@ -414,3 +414,6 @@ runs/detect/track/labels/video_7.txt
 runs/detect/track/labels/video_8.txt
 runs/detect/track/labels/video_9.txt
 runs/detect/track/video.avi
+__pycache__/test_track.cpython-312.pyc
+__pycache__/false_positive.cpython-312.pyc
+__pycache__/app.cpython-312.pyc

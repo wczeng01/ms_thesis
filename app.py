@@ -46,11 +46,6 @@ def upload_video():
                 stderr=subprocess.PIPE,
                 text=True
             )
-            print("run_tracking.py output:", yolo_process.stdout)
-            if yolo_process.returncode != 0:
-                flash("Error in the YOLO tracking process.")
-                print("run_tracking.py error:", yolo_process.stderr)
-                return redirect(url_for('index'))
         except Exception as e:
             flash(f"Error running tracking process: {e}")
             return redirect(url_for('index'))
@@ -190,11 +185,6 @@ def brood():
                 stderr=subprocess.PIPE,
                 text=True
             )
-            print("run_tracking.py output:", yolo_process.stdout)
-            if yolo_process.returncode != 0:
-                flash("Error in the YOLO tracking process.")
-                print("run_tracking.py error:", yolo_process.stderr)
-                return redirect(url_for('index'))
         except Exception as e:
             flash(f"Error running tracking process: {e}")
             return redirect(url_for('index'))

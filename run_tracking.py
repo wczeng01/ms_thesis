@@ -7,11 +7,11 @@ def main(video_path, flag):
         if flag == 0:
             model = YOLO('best1-2.pt')
             results = model.track(source=video_path, show=False, show_labels=True, show_boxes=True,
-                                  save=True, save_txt=True, stream=True, line_width=1, tracker='bytetrack.yaml')
+                                  save=True, save_txt=True, stream=False, line_width=1, tracker='bytetrack.yaml')
         else:
             model = YOLO('best3-3(v11m_50).pt')
             results = model.track(source=video_path, show=False, show_labels=True, show_boxes=True,
-                                  save=True, save_txt=True, stream=True, line_width=1, tracker='bytetrack.yaml', conf=0.1, persist=True)
+                                  save=True, save_txt=True, stream=False, line_width=1, tracker='bytetrack.yaml', conf=0.1, persist=True)
             
         # Process and save results
         for result in results:
