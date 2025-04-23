@@ -2,63 +2,59 @@ import os
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 from collections import defaultdict
+import cv2  # type: ignore
+import numpy as np  # type: ignore
+from ultralytics import YOLO  # type: ignore
 
-import cv2 #type:ignore
-import numpy as np #type:ignore
-from ultralytics import YOLO #type:ignore
-
-# Load the YOLO11 model
+# Load model
 model = YOLO('best3-3(v11m_50).pt')
 
-# Open the video file
-video_path = "2ants_cropped.mp4"
+# Open input video
+video_path = "2ants.mp4"
 cap = cv2.VideoCapture(video_path)
 
-# Store the track history
-track_history = defaultdict(lambda: [])
+# Grab properties for the writer
+fps = cap.get(cv2.CAP_PROP_FPS)
+width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
+# Define the codec and create VideoWriter
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # or 'XVID'
+out = cv2.VideoWriter('tracked_output.mp4', fourcc, fps, (width, height))
+
+track_history = defaultdict(list)
 i = 0
-# Loop through the video frames
-while cap.isOpened() and i < 100:
-    # Read a frame from the video
+
+while cap.isOpened() and i < 150:
     success, frame = cap.read()
-
-    if success:
-        i = i+1
-        # Run YOLO11 tracking on the frame, persisting tracks between frames
-        result = model.track(frame, persist=True, conf=0.1)[0]
-
-        # Get the boxes and track IDs
-        if result.boxes and result.boxes.id is not None:
-            boxes = result.boxes.xywh.cpu()
-            track_ids = result.boxes.id.int().cpu().tolist()
-
-            # Visualize the result on the frame
-            frame = result.plot()
-
-            # Plot the tracks
-            for box, track_id in zip(boxes, track_ids):
-                x, y, w, h = box
-                track = track_history[track_id]
-                track.append((float(x), float(y)))  # x, y center point
-                if len(track) > 30:  # retain 30 tracks for 30 frames
-                    track.pop(0)
-
-                # Draw the tracking lines
-                points = np.hstack(track).astype(np.int32).reshape((-1, 1, 2))
-                cv2.polylines(frame, [points], isClosed=False, color=(230, 230, 230), thickness=10)
-
-        # Display the annotated frame
-        #cv2.imshow("YOLO11 Tracking", frame)
-
-        # Break the loop if 'q' is pressed
-        # if cv2.waitKey(1) & 0xFF == ord("q"):
-        #     break
-    else:
-        # Break the loop if the end of the video is reached
+    if not success:
         break
 
-# Release the video capture object and close the display window
+    i += 1
+    if i < 100:
+        continue
+
+    # Run tracking & plot
+    result = model.track(frame, tracker='bytetrack.yaml', persist=True, conf=0.1)[0]
+    if result.boxes and result.boxes.id is not None:
+        boxes = result.boxes.xywh.cpu()
+        ids   = result.boxes.id.int().cpu().tolist()
+        frame = result.plot()
+
+        # Draw trajectories
+        for box, tid in zip(boxes, ids):
+            x, y, w, h = box
+            hist = track_history[tid]
+            hist.append((int(x), int(y)))
+            if len(hist) > 30:
+                hist.pop(0)
+            pts = np.array(hist, dtype=np.int32).reshape(-1,1,2)
+            cv2.polylines(frame, [pts], False, (230,230,230), 2)
+
+    # write the frame to video
+    out.write(frame)
+
+# clean up
 cap.release()
-cv2.imwrite('trajectory.jpg', frame)
+out.release()
 cv2.destroyAllWindows()
