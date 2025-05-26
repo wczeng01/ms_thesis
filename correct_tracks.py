@@ -6,21 +6,30 @@ from pathlib import Path
 
 def process_file(filepath):
     with open(filepath, 'r') as f:
+        # read all non-blank lines
         lines = [line.strip() for line in f if line.strip()]
-    
-    if len(lines) == 2:
-        parts1 = lines[0].split()
-        parts2 = lines[1].split()
 
-        if len(parts1) < 6:
+    # We expect either 2 total lines, or 3 (when brood + 2 ants)
+    if len(lines) in (2, 3):
+        # pick only the lines for class 0 (the ants)
+        ant_lines = [ln for ln in lines if ln.split()[0] == '0']
+        if len(ant_lines) != 2:
+            # something unexpected (e.g. brood missing or extra detections)
             return None
-        
-        # return (track ID, x-center, y-center)
+
+        # parse the two ant lines
+        parts1 = ant_lines[0].split()
+        parts2 = ant_lines[1].split()
+        if len(parts1) < 6 or len(parts2) < 6:
+            return None
+
+        # return (track ID, x-center, y-center) for each ant
         ant1 = [int(parts1[5]), float(parts1[1]), float(parts1[2])]
         ant2 = [int(parts2[5]), float(parts2[1]), float(parts2[2])]
         return ant1, ant2
-    else:
-        return None
+
+    # any other number of lines we can’t handle
+    return None
     
 def process_video(video_path, txt_dir, output_video, normalized=True):
     """
@@ -164,4 +173,4 @@ def process_video(video_path, txt_dir, output_video, normalized=True):
     return
 
 if __name__ == '__main__':
-    process_video("2ants.mp4", "../runs/detect/track (0.5,0.6,0.8) 2.5 mins/labels", "updated_tracking_video.mp4", normalized=True)
+    process_video("2ants.mp4", "runs/detect/.1 .1 .1 .9 full/labels", "updated_tracking_video.mp4", normalized=True)

@@ -1,0 +1,231 @@
+10/2/24
+deep dive on YOLO, try running generic YOLO detector on an ant video
+spend some time on ultralytics website/yolo ecosystem to find the best detector (pro & cons of each model)
+p confident on yolo tracker being able to do the job
+might have to fine-tune an object detector
+YOLO should be able to handle everything just given the ant video: generation, detection & tracking
+short presentation on the yolo ecosystem (i.e. what you can do with yolo, different yolo versions/models, here's how you run the detector, do the tracking, etc.)
+
+10/9/24
+preprocess the video, do foreground/background subtraction: compute the median of all frames, set black background to white for contrast, load video into nparray, take the median of the 3rd value and delete it
+fine-tune YOLO on ants
+we don't need the classifications, just the bounding boxes following the ants
+take a look at training, start with v8, enough frames that everything that's going to move has moved
+
+10/23/24
+export video, removing track IDs and confidences
+for tracker ants video, remove ids, add motion vectors, and be able to export/save
+think about packaging everything into an easy-to-use pipeline (can jaden do it)
+but for now proof of concept
+motion trajectory - possibly data
+
+10/30/24
+try to get 1080 working
+think about packaging into a pipeline
+
+11/6/24 (Jason Pacheco, Kobus Barnard, Anna Dornhaus) tentatively
+look into anna's papers - behavioral modeling from ant videos/tracking (don't spend too long)
+ideally anna is first or last listed amongst authors, recent > older
+downstream analysis of behavioral modeling from the collected data
+try to get rudimentary web interface up and running
+
+11/13/24
+split deploy.sh into deploy and run (the former installs all the packages and calls run, the latter just creates the app)
+to present on:
+1. quick demo of the web app
+2. roboflow procedure (also mention OBB)
+3. get their input on downstream analysis
+
+11/20/24 (in order of importance)
+1. get ant tracking running on hpc
+2. processing 4k videos at resolution
+3. retraining on new, unseen videos
+4. post-hoc annotation (possibly based on csv file)
+5. making a video of just boxes without video
+
+12/4/24
+imgsz = 3840 for 4k
+get tracking & UI app running on interactive desktop
+
+12/20/24
+brief set of instructions for running the app (set for vscode and set for command line)
+bigger issue for processing in high resolution is gpu memory (can request up to 128 GB of gpu but will take longer to allocate that job)
+email Emiliano about his type of video, test current model on how zoomed out it is
+
+email Kobus about committee role (he wants to retire)
+if he declines, Kwang or Chicheng
+
+
+# starts at 3840, 2560, 1920, 1440, 1280, 1080
+# 1/2/25:
+# v1: no resize and imgsz=3840 exceeds memory
+# v2: resize to 1920x1920 and imgsz=1920 exceeds memory
+# v3: resize to 1080x1080 and imgsz=1080 peaks at 46% memory (just under 30 gb)
+
+Analysis issues (1/10/25):
+ignore first column, x_center, y_center, width, height, ant #
+1. number of ants isn't constant, it takes time before the number levels out
+2. the entire frame is divided from 0-1, which means scaling up might be necessary
+3. box positions are on a 0-1 scale, width is in the thousandths, height is in the hundredths
+4. contact b/w non-nest areas, maybe define boundaries for areas of interest?
+
+box color change upon interaction
+cluster the boxes into 2 colonies and match those ant IDs to their respective colonies
+
+Analysis (1/25/25):
+1. boundaries are manually obtained
+2. ant IDs unsure if tracked
+3. currently reached 161 interactions over 5 minutes
+
+1/29/25
+30-40 interactions b/w the 2 colonies max
+2nd model works on video with only 2 ants
+(trivially) make sure interaction script returns 0 for 30 second 2-ant vid
+
+given yolo's popularity, look into ways to remove boxes and re-render the video with BBs
+- surprisingly, no. while YOLO’s built-in techniques (confidence filtering and NMS) do help reduce false positives, there isn’t a dedicated, separate false positive removal feature beyond these standard methods. (2/4/25)
+
+most important aspect: removing erroneous boxes and re-visualizing video with BBs
+
+run tracking
+identify wrong boxes based on show_labels
+write script that goes thru all txt files and removes the lines with the corresponding labels
+combine the txt files with original video
+
+2/5/25
+input the false ids, remove boxes, re-render, rinse and repeat
+
+2/12/5
+polish up the app then add more features
+separate tracking and false positive removal into separate functions
+add a checkpoint button that duplicates the directory
+OR: every time someone runs false_positive, give them the option to duplicate
+make sure it all runs on hpc
+
+2/14/25
+ask Emiliano what they usually do with the tracking videos and try to produce a rough approximation of it on my own
+to basically have some downstream behavioral analysis to round out the thesis (something to show)
+will make it more well-rounded even if they don't end up using it
+
+2/19/25
+control of larva, winner of a fight (octopamine)
+which ants are interacting and for how long
+
+train/process video with 2 ants & larva
+be able to track both
+is more aggressive ant more likely to win the fight (the winner stays near the brood)
+
+keep track of proximity of ants to larva over time
+look at that distribution, compare which ant spends more time closer to the larva
+also have proximity to each other
+
+2/26/25
+annotate more frames: it's more a matter of amount of annotations vs amount of frames
+make sure training loss is going down
+figure out where v11 is coming from (if building off an existing model is allowed)
+return to collab to avoid crashing
+
+3/19/25
+invite Emiliano to meet with us next week (Friday the 21st)
+express difficulty with how zoomed out the videos are; we need track ids
+check distance results (done)
+trivially try lowering track_high_thresh - 3/20/25: this didn't work. i tried setting everything to 0 in bytetracker.yaml and still couldn't detect the larva
+
+cont:
+minimum distance b/w ants for all frames:    0.000799015018632303 (no outliers: 0.01204176835020497, savgol: -0.03518494198538556)
+minimum distance b/w ants every 30 frames:   0.000962634925607860 (no outliers: 0.04081541714842572, savgol: 0.035774752587917666)
+minimum distance b/w ants every 60 frames:   0.006874122271243052 (no outliers: 0.04081541714842572, savgol: 0.022218936702865597)
+minimum distance b/w ants every 120 frames:  0.006874122271243052 (savgol: 0.07421085653147566)
+
+conclusion (3/20/25): filtering (outlier & savgol) loses information but better for identifying trends (drug effect on proximity to larva)
+
+
+3/21/25:
+run predict to find the larva position, then switch to tracking
+what happens if the ids change/swap after overlap (a fight), how to factor that in for brood.py
+every tested autotracking software would swap ids after overlap
+
+have overlap.py tell the user what frame interval(s) an overlap occurs (distance < 0.01)
+the user would take the first frame number, divide by 30, watch the video around that time until the ants separate
+do the above for every interval, at the end of each interval, determine if ids have changed and/or if ids have swapped
+if they have swapped, using the indicated frame interval endpoints, tell a new script to swap the ids for every label txt b/w such and such frame numbers (endpoints)
+if they have changed, use the "new" id swap option to edit every single line in every single txt file that has the newly created track id and replace it with the old one
+once they are satisfied with id correction, then finally run brood.py to generate the trends
+
+side note: make sampling interval a dropdown menu (every 30, 60, 120, etc frames)
+add a new option: false positive deletion, true positive preservation, and the new one: id swap (comma-separated list)
+
+4/1/25:
+overlap intractable? save_conf doesn't work, persist=True doesn't work because of
+new_track_thresh: 0.6 # threshold for init new track if the detection does not match any tracks
+lowering thresholds with persist=true doesn't work either
+can't seem to figure out how rows are entried in txt files
+
+i can't even manually define true positive IDs because there are instances when 3 & 26 invert order
+
+C:\\Users\\wzeng\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python311\\site-packages\\ultralytics
+
+C:\Users\wzeng\anaconda3\envs\tf_gpu_env\Lib\site-packages\ultralytics\
+
+8.3.27 on conda (0.25 & 0.25)
+8.3.9 in VSCode (0.5 & 0.6) <- this is the one we want
+
+4/9/25
+association problem; tracking vs detection
+hyperparameter tuning
+worst case, just run the detector to get the detection and do nearest neighbor association to get track ids (maybe Kalman filter)
+brood movement
+
+if an ant spends a proportion of time in proximity to the brood
+the premise of my track IDs postprocessing is YOLO losing 1 ant is fine, losing both is a problem - NNA should solve that problem
+NNA may swap track IDs
+
+given a trend, take the mean & median distance and compare them
+"whichever ant is closer to the brood at the end of the video is the winner"? define a proximity threshold
+for every frame where the distance between an ant and the brood is within the threshold, say that frame is under that ant's control
+whichever ant has control across the majority of the frames is the winner
+
+given new video: see how tracking does, use detection to factor in moving brood
+
+the overall pipeline is here are all the videos of ants, and the pipeline outputs a result for each video (given a video, conclusively determine if ant 1 won, ant 2 won, or nobody won)
+
+ALSO
+have a draft of the defense presentation done to look over with Jason on Wednesday 4/16
+then do a practice defense at lab meeting on Friday 4/18
+
+open the presentation with motivation: here's the scientific problem, we are supporting it from a CS aspect, here's how:
+root: does the octopamine treatment statistically increase an ant's likelihood of winning fights?
+1st child: computer science aspect: YOLO tracking on ants
+	subchild: training on ant videos
+	subchild: tracking vs detection, hyperparameter tuning
+	subchild: web app dev, pipeline formulation
+2nd child: statistical analysis based results from YOLO tracking
+	subchild: distance comparison, proximity threshold
+
+
+4/16/25
+1. No interruptions? It can happen, extended discussions better addressed offline.
+	If later slide, say i think it's best addressed in a future slide, if not please ask again
+2. Am i expected to answer everything? to the best of your ability
+3. am i allowed to jump around (files, websites)? yes
+4. how formal? pretty formal
+5. am i allowed to mention i will be working on this over the summer? yes
+
+5/21/25
+- track (.1 .1 .1 .9 if possible, figure out where bytetrack is)
+- change IDs to 1,2
+- re-render video and save
+- proximity threshold = .01
+- upload single video or upload a folder of videos
+
+5/26/25
+When you call model.track, the argument 'bytetrack.yaml' is looked up inside the installed ultralytics package, not in your app’s folder. Which exact directory that is depends on which Python interpreter (and environment) you’re running:
+If you run python app.py from your system Python (no conda/venv), it’ll use whatever ultralytics lives in your global site-packages.
+If you’ve activated a conda env (e.g. tf_gpu_env) before python app.py, it resolves to that env’s Lib/site-packages/ultralytics/bytetrack.yaml.
+Likewise for any virtualenv or venv you’ve activated.
+
+In other words, it’s always in the site-packages directory of the current interpreter:
+import ultralytics, os
+print(os.path.dirname(ultralytics.__file__))  
+# e.g. C:\Users\you\anaconda3\envs\tf_gpu_env\Lib\site-packages\ultralytics
+Under that folder you’ll find bytetrack.yaml. It does not live next to your app.py unless you explicitly copy it there or give track­er= an absolute or relative path to a file in your project.

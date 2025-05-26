@@ -1,218 +1,148 @@
-from flask import Flask, render_template, request, redirect, url_for, flash #type:ignore
+from flask import Flask, render_template, request, redirect, url_for, flash
 import os
-import subprocess
-import signal
+from werkzeug.utils import secure_filename
+
+# Tracking modules
+from ultralytics import YOLO  # type: ignore
 import false_positive
 import test_track
-from ultralytics import YOLO #type:ignore
+import correct_tracks
+
+BASE_DIR = os.path.dirname(__file__)
+TRACKER_CFG = os.path.join(BASE_DIR, "bytetrack.yaml")
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
 
+# Configuration
 UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+# Ensure upload directory exists
+def init_upload_folder():
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER)
+init_upload_folder()
 
-yolo_process = None
-uploaded_video_path = os.path.join(app.config['UPLOAD_FOLDER'], 'video.mp4')
+# Helpers
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route('/')
-def index():
-    # Home page: Upload a video.
-    return render_template('upload.html')
+# Default brood coordinates and threshold
+default_brood_x = 0.535875
 
-@app.route('/upload', methods=['POST'])
-def upload_video():
-    global yolo_process
-    if 'file' not in request.files:
-        flash('No file part in the request.')
-        return redirect(request.url)
-    
-    file = request.files['file']
-    if file.filename == '':
-        flash('No file selected.')
-        return redirect(request.url)
-    
-    if file:
-        file.save(uploaded_video_path)
-        flash('Video uploaded successfully. Now starting the tracking process...')
-        
-        try:
-            yolo_process = subprocess.Popen(
-                ['python', 'run_tracking.py', uploaded_video_path, "0"],
-                stdout=open(os.devnull, 'w'),
-                stderr=open(os.devnull, 'w'),
-                text=True
-            )
-            flash("Tracking process started successfully.")
-        except Exception as e:
-            flash(f"Error running tracking process: {e}")
-            return redirect(url_for('index'))
-        
-    return redirect(url_for('process_form'))
+default_brood_y = 0.623067
 
-@app.route('/process_form', methods=['GET'])
-def process_form():
-    return render_template('process.html')
+proximity_threshold = 0.01
 
-@app.route('/process', methods=['POST'])
-def process_ids():
-    fp_ids = request.form.get('false_positive_ids', '')
-    tp_ids = request.form.get('true_positive_ids', '')
-    duplicate_choice = request.form.get('duplicate_choice', 'no')
-    
-    # --- Optional: Duplicate the labels directory for backup if requested ---
-    if duplicate_choice.lower() == 'yes':
-        # Find the most recent tracking directory.
-        most_recent = false_positive.get_most_recent_folder("runs/detect")
-        if most_recent is None:
-            flash("Could not find tracking directory for backup.")
-            return redirect(url_for('index'))
-        source_dir = os.path.join(most_recent, "labels")
-        destination_dir = source_dir + "_backup"
-        false_positive.duplicate_directory(source_dir, destination_dir)
-        flash("Directory duplicated for backup.")
-    
-    # --- Find the most recent tracking directory for processing ---
-    most_recent = false_positive.get_most_recent_folder("runs/detect")
-    if most_recent is None:
-        flash("Could not find a valid tracking directory.")
-        return redirect(url_for('index'))
-    txt_dir = os.path.join(most_recent, "labels")
-    
-    video_path = uploaded_video_path
-    output_video = "updated_tracking_video.mp4"
-    
-    try:
-        processed_video = false_positive.process_video(tp_ids, fp_ids, video_path, txt_dir, output_video, normalized=True)
-        flash(f"Updated tracking video saved as {processed_video}")
-    except Exception as e:
-        flash(f"Error processing false/true positive IDs: {e}")
-        print("Error processing false/true positive IDs:", e)
-    
-    return redirect(url_for('process_form'))
-
-@app.route('/stop_tracking', methods=['POST'])
-def stop_tracking():
-    global yolo_process
-    if yolo_process and yolo_process.poll() is None:
-        try:
-            yolo_process.kill()  # Kills immediately.
-            yolo_process = None
-            flash('Tracking process stopped immediately.')
-            print("Tracking process killed.")
-        except Exception as e:
-            flash(f"Error stopping the tracking process: {e}")
-            print(f"Error stopping the tracking process: {e}")
-    else:
-        flash('No active tracking process.')
-    return redirect(url_for('process_form'))
-
-@app.route('/stop_tracking2', methods=['POST'])
-def stop_tracking2():
-    global yolo_process
-    if yolo_process and yolo_process.poll() is None:
-        try:
-            yolo_process.kill()  # Kills immediately.
-            yolo_process = None
-            flash('Tracking process stopped immediately.')
-            print("Tracking process killed.")
-        except Exception as e:
-            flash(f"Error stopping the tracking process: {e}")
-            print(f"Error stopping the tracking process: {e}")
-    else:
-        flash('No active tracking process.')
-    return redirect(url_for('process_form'))
-
-@app.route('/skip_tracking', methods=['POST'])
-def skip_tracking():
-    if yolo_process:
-        if yolo_process.poll() is not None:
-            flash('Tracking in progress, unable to skip.')
-    else:
-        flash('Moving to processing.')
-        return redirect(url_for('process_form'))
-    
-@app.route('/skip_tracking2', methods=['POST'])
-def skip_tracking2():
-    if yolo_process and yolo_process.poll() is None:
-        flash('Tracking still in progress, unable to skip.')
-        return redirect(url_for('index'))
-    flash('Moving to brood page.')
-    return redirect(url_for('brood_form'))
-    
-@app.route('/return_to_upload', methods=['POST'])
-def return_to_upload():
-    flash('Returning to Upload Page.')
-    return redirect(url_for('index'))
-
-@app.route('/brood_form', methods=['GET'])
+@app.route('/brood', methods=['GET'])
 def brood_form():
-    return(render_template('brood.html'))
+    # Show upload form and any results
+    return render_template('brood.html')
 
-@app.route('/brood', methods=['POST'])
-def brood():
-    global yolo_process
-    if 'file' not in request.files:
-        flash('No file part in the request.')
-        return redirect(request.url)
-    
-    file = request.files['file']
-    if file.filename == '':
-        flash('No file selected.')
-        return redirect(request.url)
-    
-    if file:
-        file.save(uploaded_video_path)
-        flash('Video uploaded successfully. Now starting the brood tracking process...')
-        
+@app.route('/upload_videos', methods=['POST'])
+def upload_videos():
+    files = request.files.getlist('videos')
+    if not files:
+        flash('No videos uploaded.')
+        return redirect(url_for('brood_form'))
+
+    outcomes = []  # list of (video_name, winner)
+
+    for f in files:
+        if not (f and allowed_file(f.filename)):
+            continue
+        filename = secure_filename(f.filename)
+        save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        f.save(save_path)
+
+        # 1. Run YOLO tracking
         try:
-            yolo_process = subprocess.Popen(
-                ['python', 'run_tracking.py', uploaded_video_path, "0"],
-                stdout=open(os.devnull, 'w'),
-                stderr=open(os.devnull, 'w'),
-                text=True
+            model = YOLO('best3-3(v11m_50).pt')
+            model.track(
+                source=save_path,
+                show=False,
+                stream=False,
+                show_labels=True,
+                show_boxes=True,
+                save=True,
+                save_txt=True,
+                line_width=1,
+                tracker=TRACKER_CFG,
+                persist=True
             )
-            flash("Tracking process started successfully.")
         except Exception as e:
-            flash(f"Error running tracking process: {e}")
-            return redirect(url_for('index'))
-        
-    return redirect(url_for('brood_form'))
+            flash(f'YOLO tracking failed for {filename}: {e}')
+            continue
 
-@app.route('/brood2', methods=['POST'])
-def brood2():
-    most_recent = false_positive.get_most_recent_folder("../runs/detect")
-    if most_recent is None:
-        flash("Could not find tracking directory.")
-        return redirect(url_for('index'))
-    else:
-        flash(most_recent)
-    txt_dir = os.path.join(most_recent, "labels")
+        # 2. Locate the new track folder
+        track_folder = false_positive.get_most_recent_folder('runs/detect')
+        if not track_folder:
+            flash(f'Could not locate track folder for {filename}.')
+            continue
+        txt_dir = os.path.join(track_folder, 'labels')
 
-    # 0.535875 0.623067
-    larva_pos = request.form.get('larva_pos', '')
-    larva_x = larva_pos.split(",")[0]
-    larva_y = larva_pos.split(",")[1]
-    flash("Larva's x coordinate: ", larva_x)
-    flash("Larva's y coordinate: ", larva_y)
-    test_track.main(txt_dir, larva_x, larva_y)
+        # 3 & 4. Remap track IDs and re-render updated video
+        updated_video = os.path.splitext(filename)[0] + '_updated.mp4'
+        try:
+            correct_tracks.process_video(
+                video_path=save_path,
+                txt_dir=txt_dir,
+                output_video=updated_video,
+                normalized=True
+            )
+        except Exception as e:
+            flash(f'Error in ID correction/rendering for {filename}: {e}')
+            continue
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    if 'file' not in request.files:
-        flash('No file part in the request.')
-        return redirect(request.url)
-    
-    file = request.files['file']
-    if file.filename == '':
-        flash('No file selected.')
-        return redirect(request.url)
-    
-    model = YOLO('best3-3(v11m_50).pt')
-    results = model.predict(source=file, save=True, conf=0.1)
+        # 5. Proximity analysis
+        count1 = 0
+        count2 = 0
+        # iterate through all label files
+        for entry in sorted(os.listdir(txt_dir)):
+            if not entry.lower().endswith('.txt'):
+                continue
+            path_txt = os.path.join(txt_dir, entry)
+            with open(path_txt, 'r') as tf:
+                lines = [ln.strip() for ln in tf if ln.strip()]
+
+            # default brood position
+            bx, by = default_brood_x, default_brood_y
+            # find brood detection if present
+            for ln in lines:
+                parts = ln.split()
+                if len(parts) < 6:
+                    continue
+                if parts[0] == '1':
+                    bx, by = float(parts[1]), float(parts[2])
+                    break
+
+            # check each ant
+            for ln in lines:
+                parts = ln.split()
+                if len(parts) < 6 or parts[0] != '0':
+                    continue
+                ax, ay = float(parts[1]), float(parts[2])
+                tid = int(parts[5])
+                dist = test_track.distance((ax, ay), (bx, by))
+                if dist <= proximity_threshold:
+                    if tid == 1:
+                        count1 += 1
+                    elif tid == 2:
+                        count2 += 1
+
+        # 6. Determine winner
+        if count1 > count2:
+            winner = 'Ant 1'
+        elif count2 > count1:
+            winner = 'Ant 2'
+        else:
+            winner = 'Tie'
+        outcomes.append((filename, winner))
+
+    # 7. Render results back to page
+    return render_template('brood.html', outcomes=outcomes)
 
 if __name__ == '__main__':
     app.run(debug=True)
